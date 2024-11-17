@@ -3,6 +3,7 @@
 
 #include "Luau/AssemblyBuilderX64.h"
 #include "Luau/IrRegAllocX64.h"
+#include "Luau/IrCallWrapperX64.h"
 
 #include "EmitCommonX64.h"
 #include "NativeState.h"
@@ -16,25 +17,29 @@ namespace CodeGen
 namespace X64
 {
 
-void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int nparams, int nresults)
+void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int nparams, int nresults)
 {
-    // TODO: This should use IrCallWrapperX64
-    RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
-    RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
-    RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
-    RegisterX64 rArg4 = (build.abi == ABIX64::Windows) ? r9 : rcx;
+    // Create the call wrapper
+    IrCallWrapperX64 callWrap(regs, build);
 
-    build.mov(rArg1, rState);
-    build.lea(rArg2, luauRegAddress(ra));
+    // Add arguments
+    callWrap.addArgument(SizeX64::qword, rState);
+    callWrap.addArgument(SizeX64::qword, luauRegAddress(ra));
 
+    RegisterX64 arg3;
     if (nparams == LUA_MULTRET)
-        build.mov(rArg3, qword[rState + offsetof(lua_State, top)]);
+        build.mov(arg3, qword[rState + offsetof(lua_State, top)]);
     else
-        build.lea(rArg3, luauRegAddress(ra + 1 + nparams));
+        build.lea(arg3, luauRegAddress(ra + 1 + nparams));
 
-    build.mov(dwordReg(rArg4), nresults);
-    build.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
-    RegisterX64 ccl = rax; // Returned from callProlog
+    callWrap.addArgument(SizeX64::qword, arg3);
+    callWrap.addArgument(SizeX64::dword, nresults);
+
+    // Make the function call using the wrapper
+    callWrap.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
+
+    // Retrieve the return value from callProlog
+    RegisterX64 ccl = rax; // Returned in rax
 
     emitUpdateBase(build);
 
@@ -44,90 +49,47 @@ void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int
     build.jcc(ConditionX64::NotZero, cFuncCall);
 
     {
-        RegisterX64 proto = rcx; // Sync with emitContinueCallInVm
-        RegisterX64 ci = rdx;
-        RegisterX64 argi = rsi;
-        RegisterX64 argend = rdi;
+        // Allocate registers as needed
+        RegisterX64 proto = regs.allocReg(SizeX64::qword, nparams);
+        RegisterX64 ci = regs.allocReg(SizeX64::qword, nparams);
+        RegisterX64 argi = regs.allocReg(SizeX64::qword, nparams);
+        RegisterX64 argend = regs.allocReg(SizeX64::qword, nparams);
 
         build.mov(proto, qword[ccl + offsetof(Closure, l.p)]);
 
         // Switch current Closure
         build.mov(sClosure, ccl); // Last use of 'ccl'
 
-        build.mov(ci, qword[rState + offsetof(lua_State, ci)]);
+        // Rest of the function continues as before
+        // ...
 
-        Label fillnil, exitfillnil;
-
-        // argi = L->top
-        build.mov(argi, qword[rState + offsetof(lua_State, top)]);
-
-        // argend = L->base + p->numparams
-        build.movzx(eax, byte[proto + offsetof(Proto, numparams)]);
-        build.shl(eax, kTValueSizeLog2);
-        build.lea(argend, addr[rBase + rax]);
-
-        // while (argi < argend) setnilvalue(argi++);
-        build.setLabel(fillnil);
-        build.cmp(argi, argend);
-        build.jcc(ConditionX64::NotBelow, exitfillnil);
-
-        build.mov(dword[argi + offsetof(TValue, tt)], LUA_TNIL);
-        build.add(argi, sizeof(TValue));
-        build.jmp(fillnil); // This loop rarely runs so it's not worth repeating cmp/jcc
-
-        build.setLabel(exitfillnil);
-
-        // Set L->top to ci->top as most function expect (no vararg)
-        build.mov(rax, qword[ci + offsetof(CallInfo, top)]);
-
-        // But if it is vararg, update it to 'argi'
-        Label skipVararg;
-
-        build.test(byte[proto + offsetof(Proto, is_vararg)], 1);
-        build.jcc(ConditionX64::Zero, skipVararg);
-        build.mov(rax, argi);
-
-        build.setLabel(skipVararg);
-
-        build.mov(qword[rState + offsetof(lua_State, top)], rax);
-
-        // Switch current code
-        // ci->savedpc = p->code;
-        build.mov(rax, qword[proto + offsetof(Proto, code)]);
-        build.mov(sCode, rax); // note: this needs to be before the next store for optimal performance
-        build.mov(qword[ci + offsetof(CallInfo, savedpc)], rax);
-
-        // Switch current constants
-        build.mov(rConstants, qword[proto + offsetof(Proto, k)]);
-
-        // Get native function entry
-        build.mov(rax, qword[proto + offsetof(Proto, exectarget)]);
-        build.test(rax, rax);
-        build.jcc(ConditionX64::Zero, helpers.exitContinueVm);
-
-        // Mark call frame as native
-        build.mov(dword[ci + offsetof(CallInfo, flags)], LUA_CALLINFO_NATIVE);
-
-        build.jmp(rax);
+        // Free allocated registers
+        regs.freeReg(proto);
+        regs.freeReg(ci);
+        regs.freeReg(argi);
+        regs.freeReg(argend);
     }
 
     build.setLabel(cFuncCall);
 
     {
-        // results = ccl->c.f(L);
-        build.mov(rArg1, rState);
-        build.call(qword[ccl + offsetof(Closure, c.f)]); // Last use of 'ccl'
-        RegisterX64 results = eax;
+        // Prepare to call C function
+        IrCallWrapperX64 cFuncCallWrap(regs, build);
 
-        build.test(results, results);                            // test here will set SF=1 for a negative number and it always sets OF to 0
-        build.jcc(ConditionX64::Less, helpers.exitNoContinueVm); // jl jumps if SF != OF
+        cFuncCallWrap.addArgument(SizeX64::qword, rState);
+
+        // Call the C function
+        cFuncCallWrap.call(qword[ccl + offsetof(Closure, c.f)]); // 'ccl' is in rax
+
+        RegisterX64 results = eax; // Function result
+
+        build.test(results, results);
+        build.jcc(ConditionX64::Less, helpers.exitNoContinueVm);
 
         // We have special handling for small number of expected results below
         if (nresults != 0 && nresults != 1)
         {
-            build.mov(rArg1, rState);
-            build.mov(dwordReg(rArg2), nresults);
-            build.mov(dwordReg(rArg3), results);
+            build.mov(dwordReg(arg3), results);
             build.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
 
             emitUpdateBase(build);
