@@ -360,7 +360,7 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
     callBarrierTableFast(regs, build, table, {});
 }
 
-void emitInstForGLoop(AssemblyBuilderX64& build, int ra, int aux, Label& loopRepeat)
+void emitInstForGLoop(regs, AssemblyBuilderX64& build, int ra, int aux, Label& loopRepeat)
 {
     // ipairs-style traversal is handled in IR
     CODEGEN_ASSERT(aux >= 0);
