@@ -130,6 +130,7 @@ void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers&
             build.mov(rArg1, rState);
             build.mov(dwordReg(rArg2), nresults);
             build.mov(dwordReg(rArg3), results);
+
             build.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
 
             emitUpdateBase(build);
@@ -301,10 +302,10 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
         build.mov(dwordReg(rArg3), last);
         build.mov(rArg2, table);
         build.mov(rArg1, rState);
-        {
-            IrCallWrapperX64 callWrap(regs, build);
-            callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
-        }
+
+        IrCallWrapperX64 callWrap(regs, build);
+        callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
+
         build.mov(table, luauRegValue(ra)); // Reload clobbered register value
 
         build.setLabel(skipResize);
@@ -430,10 +431,10 @@ void emitInstForGLoop(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, in
     build.mov(rArg1, rState);
     // rArg2 and rArg3 are already set
     build.lea(rArg4, luauRegAddress(ra));
-    {
-        IrCallWrapperX64 callWrap(regs, build);
-        callWrap.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
-    }
+
+    IrCallWrapperX64 callWrap(regs, build);
+    callWrap.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
+
     build.test(al, al);
     build.jcc(ConditionX64::NotZero, loopRepeat);
 }
