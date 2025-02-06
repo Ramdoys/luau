@@ -17,7 +17,7 @@ namespace CodeGen
 namespace X64
 {
 
-void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int nparams, int nresults)
+void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int nparams, int nresults)
 {
     RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
     RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
@@ -34,7 +34,7 @@ void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int
 
     build.mov(dwordReg(rArg4), nresults);
 
-    IrCallWrapperX64 callWrap(build);
+    IrCallWrapperX64 callWrap(regs, build);
     callWrap.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
     RegisterX64 ccl = rax; // Returned from callProlog
 
