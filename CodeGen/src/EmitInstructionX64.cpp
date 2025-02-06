@@ -6,6 +6,7 @@
 
 #include "EmitCommonX64.h"
 #include "NativeState.h"
+#include "IrCallWrapperX64.h"  // <-- added include
 
 #include "lstate.h"
 
@@ -18,11 +19,11 @@ namespace X64
 
 void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int nparams, int nresults)
 {
-    // TODO: This should use IrCallWrapperX64
+    // Use IrCallWrapperX64 instead of a direct call
     RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
     RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
-    RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
-    RegisterX64 rArg4 = (build.abi == ABIX64::Windows) ? r9 : rcx;
+    RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8  : rdx;
+    RegisterX64 rArg4 = (build.abi == ABIX64::Windows) ? r9  : rcx;
 
     build.mov(rArg1, rState);
     build.lea(rArg2, luauRegAddress(ra));
@@ -33,7 +34,10 @@ void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int
         build.lea(rArg3, luauRegAddress(ra + 1 + nparams));
 
     build.mov(dwordReg(rArg4), nresults);
-    build.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
+
+    // Instead of calling callProlog directly, use the IrCallWrapperX64 helper.
+    IrCallWrapperX64 callWrap(build);
+    callWrap.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
     RegisterX64 ccl = rax; // Returned from callProlog
 
     emitUpdateBase(build);
