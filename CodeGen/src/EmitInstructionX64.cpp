@@ -253,7 +253,6 @@ void emitInstReturn(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, i
 
 void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int rb, int count, uint32_t index, int knownSize)
 {
-    // TODO: This should use IrCallWrapperX64
     RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
     RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
     RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
@@ -302,7 +301,10 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
         build.mov(dwordReg(rArg3), last);
         build.mov(rArg2, table);
         build.mov(rArg1, rState);
-        build.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
+        {
+            IrCallWrapperX64 callWrap(regs, build);
+            callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
+        }
         build.mov(table, luauRegValue(ra)); // Reload clobbered register value
 
         build.setLabel(skipResize);
@@ -363,7 +365,6 @@ void emitInstForGLoop(AssemblyBuilderX64& build, int ra, int aux, Label& loopRep
     // ipairs-style traversal is handled in IR
     CODEGEN_ASSERT(aux >= 0);
 
-    // TODO: This should use IrCallWrapperX64
     RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
     RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
     RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
@@ -429,7 +430,10 @@ void emitInstForGLoop(AssemblyBuilderX64& build, int ra, int aux, Label& loopRep
     build.mov(rArg1, rState);
     // rArg2 and rArg3 are already set
     build.lea(rArg4, luauRegAddress(ra));
-    build.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
+    {
+        IrCallWrapperX64 callWrap(regs, build);
+        callWrap.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
+    }
     build.test(al, al);
     build.jcc(ConditionX64::NotZero, loopRepeat);
 }
