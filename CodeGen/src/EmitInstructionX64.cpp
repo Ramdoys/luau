@@ -133,8 +133,8 @@ void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers&
             build.mov(dwordReg(rArg2), nresults);
             build.mov(dwordReg(rArg3), results);
 
-            //IrCallWrapperX64 callWrap(regs, build);
-            build.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
+            IrCallWrapperX64 callWrap(regs, build);
+            callWrap.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
 
             emitUpdateBase(build);
             return;
