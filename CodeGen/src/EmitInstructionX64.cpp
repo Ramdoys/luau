@@ -303,8 +303,9 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
         build.mov(rArg2, table);
         build.mov(rArg1, rState);
 
-        IrCallWrapperX64 callWrap(regs, build);
-        callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
+        build.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
+        //IrCallWrapperX64 callWrap(regs, build);
+        //callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
 
         build.mov(table, luauRegValue(ra)); // Reload clobbered register value
 
@@ -379,7 +380,7 @@ void emitInstForGLoop(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, in
     RegisterX64 elemPtr = rax;
 
     IrCallWrapperX64 callWrap(regs, build);
-
+d
     build.mov(table, luauRegValue(ra + 1));
     build.mov(index, luauRegValue(ra + 2));
 
