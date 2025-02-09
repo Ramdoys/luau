@@ -264,8 +264,6 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
     // We also keep 'count' scaled by sizeof(TValue) here as it helps in the loop below
     RegisterX64 cscaled = rbx;
 
-    IrCallWrapperX64 callWrap(regs, build);
-
     if (count == LUA_MULTRET)
     {
         RegisterX64 tmp = rax;
