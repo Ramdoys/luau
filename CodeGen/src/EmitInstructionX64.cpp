@@ -380,7 +380,7 @@ void emitInstForGLoop(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, in
     RegisterX64 elemPtr = rax;
 
     IrCallWrapperX64 callWrap(regs, build);
-d
+ 
     build.mov(table, luauRegValue(ra + 1));
     build.mov(index, luauRegValue(ra + 2));
 
