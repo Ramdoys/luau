@@ -305,7 +305,7 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
         build.mov(dwordReg(rArg3), last);
         build.mov(rArg2, table);
         build.mov(rArg1, rState);
-        IrCallWrapperX64 callWrap(regs, build, index)
+        IrCallWrapperX64 callWrap(regs, build, index);
         callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
 
         build.mov(table, luauRegValue(ra)); // Reload clobbered register value
