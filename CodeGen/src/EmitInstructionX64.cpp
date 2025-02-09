@@ -379,8 +379,6 @@ void emitInstForGLoop(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, in
     RegisterX64 index = rArg3;
     RegisterX64 elemPtr = rax;
 
-    IrCallWrapperX64 callWrap(regs, build);
- 
     build.mov(table, luauRegValue(ra + 1));
     build.mov(index, luauRegValue(ra + 2));
 
@@ -435,6 +433,7 @@ void emitInstForGLoop(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, in
     // rArg2 and rArg3 are already set
     build.lea(rArg4, luauRegAddress(ra));
 
+    IrCallWrapperX64 callWrap(regs, build);
     callWrap.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
 
     build.test(al, al);
