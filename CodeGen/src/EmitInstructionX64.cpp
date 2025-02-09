@@ -118,7 +118,7 @@ void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers&
     {
         // results = ccl->c.f(L);
         build.mov(rArg1, rState);
-        build.call(qword[ccl + offsetof(Closure, c.f)]); // Last use of 'ccl'
+        callWrap.call(qword[ccl + offsetof(Closure, c.f)]); // Last use of 'ccl'
         RegisterX64 results = eax;
 
         build.test(results, results);                            // test here will set SF=1 for a negative number and it always sets OF to 0
@@ -131,7 +131,7 @@ void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers&
             build.mov(dwordReg(rArg2), nresults);
             build.mov(dwordReg(rArg3), results);
 
-            build.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
+            callWrap.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
 
             emitUpdateBase(build);
             return;
@@ -264,6 +264,8 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
     // We also keep 'count' scaled by sizeof(TValue) here as it helps in the loop below
     RegisterX64 cscaled = rbx;
 
+    IrCallWrapperX64 callWrap(regs, build);
+
     if (count == LUA_MULTRET)
     {
         RegisterX64 tmp = rax;
@@ -303,9 +305,7 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
         build.mov(rArg2, table);
         build.mov(rArg1, rState);
 
-        build.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
-        //IrCallWrapperX64 callWrap(regs, build);
-        //callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
+        callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
 
         build.mov(table, luauRegValue(ra)); // Reload clobbered register value
 
