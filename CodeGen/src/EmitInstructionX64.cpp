@@ -119,8 +119,8 @@ void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers&
         // results = ccl->c.f(L);
         build.mov(rArg1, rState);
 
-        IrCallWrapperX64 callWrap(regs, build);
-        callWrap.call(qword[ccl + offsetof(Closure, c.f)]); // Last use of 'ccl'
+        //IrCallWrapperX64 callWrap(regs, build);
+        build.call(qword[ccl + offsetof(Closure, c.f)]); // Last use of 'ccl'
         RegisterX64 results = eax;
 
         build.test(results, results);                            // test here will set SF=1 for a negative number and it always sets OF to 0
@@ -133,8 +133,8 @@ void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers&
             build.mov(dwordReg(rArg2), nresults);
             build.mov(dwordReg(rArg3), results);
 
-            IrCallWrapperX64 callWrap(regs, build);
-            callWrap.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
+            //IrCallWrapperX64 callWrap(regs, build);
+            build.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
 
             emitUpdateBase(build);
             return;
