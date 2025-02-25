@@ -3,6 +3,7 @@
 
 #include "Luau/AssemblyBuilderX64.h"
 #include "Luau/IrRegAllocX64.h"
+#include "Luau/IrCallWrapperX64.h"
 
 #include "EmitCommonX64.h"
 #include "NativeState.h"
@@ -16,13 +17,12 @@ namespace CodeGen
 namespace X64
 {
 
-void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int nparams, int nresults)
+void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int nparams, int nresults)
 {
-    // TODO: This should use IrCallWrapperX64
     RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
     RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
-    RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
-    RegisterX64 rArg4 = (build.abi == ABIX64::Windows) ? r9 : rcx;
+    RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8  : rdx;
+    RegisterX64 rArg4 = (build.abi == ABIX64::Windows) ? r9  : rcx;
 
     build.mov(rArg1, rState);
     build.lea(rArg2, luauRegAddress(ra));
@@ -33,7 +33,9 @@ void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int
         build.lea(rArg3, luauRegAddress(ra + 1 + nparams));
 
     build.mov(dwordReg(rArg4), nresults);
-    build.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
+
+    IrCallWrapperX64 callWrap(regs, build);
+    callWrap.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
     RegisterX64 ccl = rax; // Returned from callProlog
 
     emitUpdateBase(build);
@@ -116,6 +118,8 @@ void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int
     {
         // results = ccl->c.f(L);
         build.mov(rArg1, rState);
+
+        //IrCallWrapperX64 callWrap(regs, build);
         build.call(qword[ccl + offsetof(Closure, c.f)]); // Last use of 'ccl'
         RegisterX64 results = eax;
 
@@ -128,7 +132,9 @@ void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int
             build.mov(rArg1, rState);
             build.mov(dwordReg(rArg2), nresults);
             build.mov(dwordReg(rArg3), results);
-            build.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
+
+            IrCallWrapperX64 callWrap(regs, build);
+            callWrap.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
 
             emitUpdateBase(build);
             return;
@@ -251,7 +257,6 @@ void emitInstReturn(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, i
 
 void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int rb, int count, uint32_t index, int knownSize)
 {
-    // TODO: This should use IrCallWrapperX64
     RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
     RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
     RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
@@ -300,7 +305,11 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
         build.mov(dwordReg(rArg3), last);
         build.mov(rArg2, table);
         build.mov(rArg1, rState);
+
+        //IrCallWrapperX64 callWrap(regs, build, index);
+        //callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
         build.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
+
         build.mov(table, luauRegValue(ra)); // Reload clobbered register value
 
         build.setLabel(skipResize);
@@ -356,12 +365,11 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
     callBarrierTableFast(regs, build, table, {});
 }
 
-void emitInstForGLoop(AssemblyBuilderX64& build, int ra, int aux, Label& loopRepeat)
+void emitInstForGLoop(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int aux, Label& loopRepeat)
 {
     // ipairs-style traversal is handled in IR
     CODEGEN_ASSERT(aux >= 0);
 
-    // TODO: This should use IrCallWrapperX64
     RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
     RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
     RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
@@ -427,7 +435,10 @@ void emitInstForGLoop(AssemblyBuilderX64& build, int ra, int aux, Label& loopRep
     build.mov(rArg1, rState);
     // rArg2 and rArg3 are already set
     build.lea(rArg4, luauRegAddress(ra));
-    build.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
+
+    IrCallWrapperX64 callWrap(regs, build);
+    callWrap.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
+
     build.test(al, al);
     build.jcc(ConditionX64::NotZero, loopRepeat);
 }
