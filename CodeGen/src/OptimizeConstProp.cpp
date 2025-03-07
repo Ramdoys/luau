@@ -16,8 +16,6 @@
 #include <utility>
 #include <vector>
 
-struct Proto;
-
 LUAU_FASTINTVARIABLE(LuauCodeGenMinLinearBlockPath, 3)
 LUAU_FASTINTVARIABLE(LuauCodeGenReuseSlotLimit, 64)
 LUAU_FASTINTVARIABLE(LuauCodeGenReuseUdataTagLimit, 64)
@@ -69,7 +67,7 @@ struct ConstPropState
         , valueMap({})
     {
         // Initialize maxReg from Proto if available, otherwise use a safe default
-        maxReg = function.proto ? function.proto->maxstacksize - 1 : 255;
+        maxReg = function.proto ? function.proto->maxstacksize : 255;
     }
 
     uint8_t tryGetTag(IrOp op)
