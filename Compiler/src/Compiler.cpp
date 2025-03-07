@@ -286,6 +286,19 @@ struct Compiler
         if (func->hasNativeAttribute())
             protoflags |= LPF_NATIVE_FUNCTION;
 
+        if (options.optimizationLevel >= 2)
+        {
+            for (size_t i = 0; i + 1 < func->instructions.size(); ++i)
+            {
+                Instruction& inst = func->instructions[i];
+                const Instruction& next = func->instructions[i+1];
+                if (inst.opcode == OP_LOADNIL && next.opcode == OP_LOADN && inst.A == next.A)
+                {
+                    inst.opcode = OP_NOP;
+                }
+            }
+        }
+
         bytecode.endFunction(uint8_t(stackSize), uint8_t(upvals.size()), protoflags);
 
         Function& f = functions[func];
