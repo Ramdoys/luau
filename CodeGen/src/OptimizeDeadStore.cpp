@@ -6,7 +6,7 @@
 #include "Luau/IrUtils.h"
 
 #include <array>
-w
+
 #include "lobject.h"
 
 // TODO: optimization can be improved by knowing which registers are live in at each VM exit
