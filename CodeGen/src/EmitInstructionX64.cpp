@@ -24,13 +24,13 @@ void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int
     {
         // Assuming a way to obtain a reg-allocator; if not available, a dummy reference may be needed.
         IrCallWrapperX64 callWrap(/* regAlloc */  *(IrRegAllocX64*)nullptr, build);  // Provide valid reg allocator
-        callWrap.addArgument(/* SizeX64::Ptr, */ rState);                      // Pass first argument: rState
-        callWrap.addArgument(/* SizeX64::Ptr, */ luauRegAddress(ra));            // Pass second argument: address of ra
+        callWrap.addArgument(SizeX64::Ptr, rState);                      // Pass first argument: rState
+        callWrap.addArgument(SizeX64::Ptr, luauRegAddress(ra));            // Pass second argument: address of ra
         if (nparams == LUA_MULTRET)
-            callWrap.addArgument(/* SizeX64::Ptr, */ qword[rState + offsetof(lua_State, top)]);  // Third argument
+            callWrap.addArgument(SizeX64::Ptr, qword[rState + offsetof(lua_State, top)]);  // Third argument
         else
-            callWrap.addArgument(/* SizeX64::Ptr, */ luauRegAddress(ra + 1 + nparams));           // Third argument
-        callWrap.addArgument(/* SizeX64::DWord, */ nresults);                    // Fourth argument
+            callWrap.addArgument(SizeX64::Ptr, luauRegAddress(ra + 1 + nparams));           // Third argument
+        callWrap.addArgument(SizeX64::DWord, nresults);                    // Fourth argument
         callWrap.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
         RegisterX64 ccl = rax; // Returned from callProlog
     }
@@ -255,9 +255,9 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
     {
         IrCallWrapperX64 callWrap(regs, build);
         // Add the appropriate arguments for the resize helper call.
-        callWrap.addArgument(/* SizeX64::DWord, */ dword[table + offsetof(LuaTable, sizearray)]);
-        callWrap.addArgument(/* SizeX64::DWord, */ last);
-        callWrap.addArgument(/* SizeX64::Ptr, */ rState);
+        callWrap.addArgument(SizeX64::DWord, dword[table + offsetof(LuaTable, sizearray)]);
+        callWrap.addArgument(SizeX64::DWord, last);
+        callWrap.addArgument(SizeX64::Ptr, rState);
         callWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
         // Reload any clobbered register if needed.
         build.mov(table, luauRegValue(ra));
@@ -373,9 +373,9 @@ void emitInstForGLoop(AssemblyBuilderX64& build, int ra, int aux, Label& loopRep
     {
         // For this helper call, assume a dummy reg-allocator as needed.
         IrCallWrapperX64 callWrap(*(IrRegAllocX64*)nullptr, build);  // Provide valid reg allocator
-        callWrap.addArgument(/* SizeX64::Ptr, */ rState);
+        callWrap.addArgument(SizeX64::Ptr, rState);
         // rArg2 and rArg3 are already set via build.mov above if needed.
-        callWrap.addArgument(/* SizeX64::Ptr, */ luauRegAddress(ra));
+        callWrap.addArgument(SizeX64::Ptr, luauRegAddress(ra));
         callWrap.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
         // The return value sets flags to decide loopRepeat.
     }
