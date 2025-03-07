@@ -66,6 +66,8 @@ struct ConstPropState
         : function(function)
         , valueMap({})
     {
+        // Initialize maxReg from Proto if available, otherwise use a safe default
+        maxReg = function.proto ? function.proto->maxstacksize - 1 : 255;
     }
 
     uint8_t tryGetTag(IrOp op)
@@ -139,22 +141,16 @@ struct ConstPropState
 
     void invalidateTag(IrOp regOp)
     {
-        // TODO: use maxstacksize from Proto
-        maxReg = vmRegOp(regOp) > maxReg ? vmRegOp(regOp) : maxReg;
         invalidate(regs[vmRegOp(regOp)], /* invalidateTag */ true, /* invalidateValue */ false);
     }
 
     void invalidateValue(IrOp regOp)
     {
-        // TODO: use maxstacksize from Proto
-        maxReg = vmRegOp(regOp) > maxReg ? vmRegOp(regOp) : maxReg;
         invalidate(regs[vmRegOp(regOp)], /* invalidateTag */ false, /* invalidateValue */ true);
     }
 
     void invalidate(IrOp regOp)
     {
-        // TODO: use maxstacksize from Proto
-        maxReg = vmRegOp(regOp) > maxReg ? vmRegOp(regOp) : maxReg;
         invalidate(regs[vmRegOp(regOp)], /* invalidateTag */ true, /* invalidateValue */ true);
     }
 
@@ -263,13 +259,11 @@ struct ConstPropState
     {
         if (op.kind == IrOpKind::VmReg)
         {
-            maxReg = vmRegOp(op) > maxReg ? vmRegOp(op) : maxReg;
             return &regs[vmRegOp(op)];
         }
 
         if (RegisterLink* link = tryGetRegLink(op))
         {
-            maxReg = int(link->reg) > maxReg ? int(link->reg) : maxReg;
             return &regs[link->reg];
         }
 
@@ -479,7 +473,6 @@ struct ConstPropState
         for (int i = 0; i <= maxReg; ++i)
             regs[i] = RegisterInfo();
 
-        maxReg = 0;
         instPos = 0u;
 
         inSafeEnv = false;
