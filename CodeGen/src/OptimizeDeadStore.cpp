@@ -6,7 +6,7 @@
 #include "Luau/IrUtils.h"
 
 #include <array>
-
+w
 #include "lobject.h"
 
 // TODO: optimization can be improved by knowing which registers are live in at each VM exit
@@ -140,7 +140,21 @@ struct RemoveDeadStoreState
     {
         if (op.kind == IrOpKind::VmExit)
         {
-            readAllRegs();
+            // Improved handling: if CFG live–out info is available for this exit,
+            // use it to mark only live registers; otherwise, fall back to reading all registers.
+            if (op.index < function.cfg.out.size())
+            {
+                const RegisterSet& out = function.cfg.out[op.index];
+                for (int i = 0; i <= maxReg; i++)
+                {
+                    if (out.regs.test(i) || (out.varargSeq && i >= out.varargStart))
+                        useReg(i);
+                }
+            }
+            else
+            {
+                readAllRegs();
+            }
         }
         else if (op.kind == IrOpKind::Block)
         {
