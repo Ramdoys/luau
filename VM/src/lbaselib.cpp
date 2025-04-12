@@ -3,7 +3,6 @@
 #include "lualib.h"
 
 #include "lstate.h"
-#include "lapi.h"
 #include "ldo.h"
 #include "ludata.h"
 

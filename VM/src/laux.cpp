@@ -4,8 +4,6 @@
 
 #include "lobject.h"
 #include "lstate.h"
-#include "lstring.h"
-#include "lapi.h"
 #include "lgc.h"
 #include "lnumutils.h"
 

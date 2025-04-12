@@ -1,7 +1,6 @@
 // This file is part of the Luau programming language and is licensed under MIT License; see LICENSE.txt for details
 #include "lualib.h"
 
-#include "lcommon.h"
 #include "lbuffer.h"
 
 #if defined(LUAU_BIG_ENDIAN)

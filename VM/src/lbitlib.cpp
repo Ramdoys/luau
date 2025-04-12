@@ -2,9 +2,6 @@
 // This code is based on Lua 5.x implementation licensed under MIT License; see lua_LICENSE.txt for details
 #include "lualib.h"
 
-#include "lcommon.h"
-#include "lnumutils.h"
-
 #define ALLONES ~0u
 #define NBITS int(8 * sizeof(unsigned))
 
@@ -12,7 +9,7 @@
 #define trim(x) ((x) & ALLONES)
 
 // builds a number with 'n' ones (1 <= n <= NBITS)
-#define mask(n) (~((ALLONES << 1) << ((n)-1)))
+#define mask(n) (~((ALLONES << 1) << ((n) - 1)))
 
 typedef unsigned b_uint;
 
