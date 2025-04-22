@@ -33,14 +33,14 @@ namespace Luau
 
 using namespace Luau::Compile;
 
-static const uint32_t kMaxRegisterCount = 255;
-static const uint32_t kMaxUpvalueCount = 200;
-static const uint32_t kMaxLocalCount = 200;
-static const uint32_t kMaxInstructionCount = 1'000'000'000;
+static constexpr uint32_t kMaxRegisterCount = 255;
+static constexpr uint32_t kMaxUpvalueCount = 200;
+static constexpr uint32_t kMaxLocalCount = 200;
+static constexpr uint32_t kMaxInstructionCount = 1'000'000'000;
 
-static const uint8_t kInvalidReg = 255;
+static constexpr uint8_t kInvalidReg = 255;
 
-static const uint32_t kDefaultAllocPc = ~0u;
+static constexpr uint32_t kDefaultAllocPc = ~0u;
 
 CompileError::CompileError(const Location& location, const std::string& message)
     : location(location)
