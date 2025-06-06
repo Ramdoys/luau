@@ -3,6 +3,7 @@
 
 #include "Luau/AssemblyBuilderX64.h"
 #include "Luau/IrRegAllocX64.h"
+#include "Luau/IrCallWrapperX64.h"
 
 #include "EmitCommonX64.h"
 #include "NativeState.h"
@@ -16,25 +17,19 @@ namespace CodeGen
 namespace X64
 {
 
-void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int nparams, int nresults)
+void emitInstCall(IrRegAllocX64& regs, AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int nparams, int nresults, uint32_t instIdx)
 {
-    // TODO: This should use IrCallWrapperX64
-    RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
-    RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
-    RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
-    RegisterX64 rArg4 = (build.abi == ABIX64::Windows) ? r9 : rcx;
+    IrCallWrapperX64 callPrologWrap(regs, build, instIdx);
+    callPrologWrap.addArgument(SizeX64::qword, rState);
+    callPrologWrap.addArgument(SizeX64::qword, luauRegAddress(ra));
 
-    build.mov(rArg1, rState);
-    build.lea(rArg2, luauRegAddress(ra));
-
-    if (nparams == LUA_MULTRET)
-        build.mov(rArg3, qword[rState + offsetof(lua_State, top)]);
-    else
-        build.lea(rArg3, luauRegAddress(ra + 1 + nparams));
-
-    build.mov(dwordReg(rArg4), nresults);
-    build.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
-    RegisterX64 ccl = rax; // Returned from callProlog
+    OperandX64 targetTop = (nparams == LUA_MULTRET)
+                               ? OperandX64(qword[rState + offsetof(lua_State, top)])
+                               : luauRegAddress(ra + 1 + nparams);
+    callPrologWrap.addArgument(SizeX64::qword, targetTop);
+    callPrologWrap.addArgument(SizeX64::dword, OperandX64(nresults));
+    callPrologWrap.call(qword[rNativeContext + offsetof(NativeContext, callProlog)]);
+    RegisterX64 ccl = rax;
 
     emitUpdateBase(build);
 
@@ -115,20 +110,21 @@ void emitInstCall(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, int
 
     {
         // results = ccl->c.f(L);
-        build.mov(rArg1, rState);
-        build.call(qword[ccl + offsetof(Closure, c.f)]); // Last use of 'ccl'
+        IrCallWrapperX64 cFuncCallWrap(regs, build, instIdx);
+        cFuncCallWrap.addArgument(SizeX64::qword, rState);
+        cFuncCallWrap.call(qword[ccl + offsetof(Closure, c.f)]);
         RegisterX64 results = eax;
 
-        build.test(results, results);                            // test here will set SF=1 for a negative number and it always sets OF to 0
-        build.jcc(ConditionX64::Less, helpers.exitNoContinueVm); // jl jumps if SF != OF
+        build.test(results, results);
+        build.jcc(ConditionX64::Less, helpers.exitNoContinueVm);
 
-        // We have special handling for small number of expected results below
         if (nresults != 0 && nresults != 1)
         {
-            build.mov(rArg1, rState);
-            build.mov(dwordReg(rArg2), nresults);
-            build.mov(dwordReg(rArg3), results);
-            build.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
+            IrCallWrapperX64 callEpilogCWrap(regs, build, instIdx);
+            callEpilogCWrap.addArgument(SizeX64::qword, rState);
+            callEpilogCWrap.addArgument(SizeX64::dword, OperandX64(nresults));
+            callEpilogCWrap.addArgument(SizeX64::dword, results);
+            callEpilogCWrap.call(qword[rNativeContext + offsetof(NativeContext, callEpilogC)]);
 
             emitUpdateBase(build);
             return;
@@ -249,12 +245,8 @@ void emitInstReturn(AssemblyBuilderX64& build, ModuleHelpers& helpers, int ra, i
     }
 }
 
-void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int rb, int count, uint32_t index, int knownSize)
+void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int rb, int count, uint32_t index, int knownSize, uint32_t instIdx)
 {
-    // TODO: This should use IrCallWrapperX64
-    RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
-    RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
-    RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
 
     OperandX64 last = index + count - 1;
 
@@ -295,13 +287,13 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
         build.cmp(dword[table + offsetof(LuaTable, sizearray)], last);
         build.jcc(ConditionX64::NotBelow, skipResize);
 
-        // Argument setup reordered to avoid conflicts
-        CODEGEN_ASSERT(rArg3 != table);
-        build.mov(dwordReg(rArg3), last);
-        build.mov(rArg2, table);
-        build.mov(rArg1, rState);
-        build.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
-        build.mov(table, luauRegValue(ra)); // Reload clobbered register value
+        IrCallWrapperX64 resizeCallWrap(regs, build, instIdx);
+        resizeCallWrap.addArgument(SizeX64::qword, rState);
+        resizeCallWrap.addArgument(SizeX64::qword, table);
+        resizeCallWrap.addArgument(SizeX64::dword, last); 
+        resizeCallWrap.call(qword[rNativeContext + offsetof(NativeContext, luaH_resizearray)]);
+        build.mov(table, luauRegValue(ra));
+
 
         build.setLabel(skipResize);
     }
@@ -356,31 +348,25 @@ void emitInstSetList(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int
     callBarrierTableFast(regs, build, table, {});
 }
 
-void emitInstForGLoop(AssemblyBuilderX64& build, int ra, int aux, Label& loopRepeat)
+void emitInstForGLoop(IrRegAllocX64& regs, AssemblyBuilderX64& build, int ra, int aux, Label& loopRepeat, uint32_t instIdx)
 {
     // ipairs-style traversal is handled in IR
     CODEGEN_ASSERT(aux >= 0);
 
-    // TODO: This should use IrCallWrapperX64
-    RegisterX64 rArg1 = (build.abi == ABIX64::Windows) ? rcx : rdi;
-    RegisterX64 rArg2 = (build.abi == ABIX64::Windows) ? rdx : rsi;
-    RegisterX64 rArg3 = (build.abi == ABIX64::Windows) ? r8 : rdx;
-    RegisterX64 rArg4 = (build.abi == ABIX64::Windows) ? r9 : rcx;
 
-    // This is a fast-path for builtin table iteration, tag check for 'ra' has to be performed before emitting this instruction
 
-    // Registers are chosen in this way to simplify fallback code for the node part
-    RegisterX64 table = rArg2;
-    RegisterX64 index = rArg3;
+    RegisterX64 tableValReg = regs.takeReg(rcx, instIdx);
+    RegisterX64 indexValReg = regs.takeReg(rdx, instIdx);
+
+    build.mov(tableValReg, luauRegValue(ra + 1));
+    build.mov(indexValReg, luauRegValue(ra + 2));
+
     RegisterX64 elemPtr = rax;
 
-    build.mov(table, luauRegValue(ra + 1));
-    build.mov(index, luauRegValue(ra + 2));
-
     // &array[index]
-    build.mov(dwordReg(elemPtr), dwordReg(index));
+    build.mov(dwordReg(elemPtr), dwordReg(indexValReg));
     build.shl(dwordReg(elemPtr), kTValueSizeLog2);
-    build.add(elemPtr, qword[table + offsetof(LuaTable, array)]);
+    build.add(elemPtr, qword[tableValReg + offsetof(LuaTable, array)]);
 
     // Clear extra variables since we might have more than two
     for (int i = 2; i < aux; ++i)
@@ -391,22 +377,22 @@ void emitInstForGLoop(AssemblyBuilderX64& build, int ra, int aux, Label& loopRep
     // First we advance index through the array portion
     // while (unsigned(index) < unsigned(sizearray))
     Label arrayLoop = build.setLabel();
-    build.cmp(dwordReg(index), dword[table + offsetof(LuaTable, sizearray)]);
+    build.cmp(dwordReg(indexValReg), dword[tableValReg + offsetof(LuaTable, sizearray)]);
     build.jcc(ConditionX64::NotBelow, skipArray);
 
     // If element is nil, we increment the index; if it's not, we still need 'index + 1' inside
-    build.inc(index);
+    build.inc(indexValReg);
 
     build.cmp(dword[elemPtr + offsetof(TValue, tt)], LUA_TNIL);
     build.jcc(ConditionX64::Equal, skipArrayNil);
 
     // setpvalue(ra + 2, reinterpret_cast<void*>(uintptr_t(index + 1)), LU_TAG_ITERATOR);
-    build.mov(luauRegValue(ra + 2), index);
+    build.mov(luauRegValue(ra + 2), indexValReg);
     // Extra should already be set to LU_TAG_ITERATOR
     // Tag should already be set to lightuserdata
 
     // setnvalue(ra + 3, double(index + 1));
-    build.vcvtsi2sd(xmm0, xmm0, dwordReg(index));
+    build.vcvtsi2sd(xmm0, xmm0, dwordReg(indexValReg)); 
     build.vmovsd(luauRegValue(ra + 3), xmm0);
     build.mov(luauRegTag(ra + 3), LUA_TNUMBER);
 
@@ -424,10 +410,16 @@ void emitInstForGLoop(AssemblyBuilderX64& build, int ra, int aux, Label& loopRep
     build.setLabel(skipArray);
 
     // Call helper to assign next node value or to signal loop exit
-    build.mov(rArg1, rState);
-    // rArg2 and rArg3 are already set
-    build.lea(rArg4, luauRegAddress(ra));
-    build.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
+    IrCallWrapperX64 forgLoopCallWrap(regs, build, instIdx);
+    forgLoopCallWrap.addArgument(SizeX64::qword, rState);
+    forgLoopCallWrap.addArgument(SizeX64::qword, tableValReg);
+    forgLoopCallWrap.addArgument(SizeX64::qword, indexValReg);
+    forgLoopCallWrap.addArgument(SizeX64::qword, luauRegAddress(ra));
+    forgLoopCallWrap.call(qword[rNativeContext + offsetof(NativeContext, forgLoopNodeIter)]);
+
+    regs.freeReg(tableValReg);
+    regs.freeReg(indexValReg);
+
     build.test(al, al);
     build.jcc(ConditionX64::NotZero, loopRepeat);
 }
