@@ -1,2 +1,0 @@
-/usr/bin/ar qc libLuau.Require.a CMakeFiles/Luau.Require.dir/Require/Runtime/src/Navigation.cpp.o CMakeFiles/Luau.Require.dir/Require/Runtime/src/Require.cpp.o CMakeFiles/Luau.Require.dir/Require/Runtime/src/RequireImpl.cpp.o
-/usr/bin/ranlib libLuau.Require.a
