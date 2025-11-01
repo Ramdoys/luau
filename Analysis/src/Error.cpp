@@ -12,6 +12,7 @@
 #include "Luau/TypeFunction.h"
 
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -30,42 +31,43 @@ static std::string wrongNumberOfArgsString(
     bool isVariadic = false
 )
 {
-    std::string s = "expects ";
+    std::ostringstream s;
+    s << "expects ";
 
     if (isVariadic)
-        s += "at least ";
+        s << "at least ";
 
-    s += std::to_string(expectedCount) + " ";
+    s << expectedCount << " ";
 
     if (maximumCount && expectedCount != *maximumCount)
-        s += "to " + std::to_string(*maximumCount) + " ";
+        s << "to " << *maximumCount << " ";
 
     if (argPrefix)
-        s += std::string(argPrefix) + " ";
+        s << argPrefix << " ";
 
-    s += "argument";
+    s << "argument";
     if ((maximumCount ? *maximumCount : expectedCount) != 1)
-        s += "s";
+        s << "s";
 
-    s += ", but ";
+    s << ", but ";
 
     if (actualCount == 0)
     {
-        s += "none";
+        s << "none";
     }
     else
     {
         if (actualCount < expectedCount)
-            s += "only ";
+            s << "only ";
 
-        s += std::to_string(actualCount);
+        s << actualCount;
     }
 
-    s += (actualCount == 1) ? " is" : " are";
+    s << ((actualCount == 1) ? " is" : " are");
 
-    s += " specified";
+    s << " specified";
 
-    return s;
+    return s.str();
 }
 
 namespace Luau
@@ -427,7 +429,8 @@ struct ErrorConverter
     {
         if (auto unionTy = get<UnionType>(follow(e.ty)))
         {
-            std::string err = "Cannot call a value of the union type:";
+            std::ostringstream err;
+            err << "Cannot call a value of the union type:";
 
             for (auto option : unionTy)
             {
@@ -435,7 +438,7 @@ struct ErrorConverter
 
                 if (get<FunctionType>(option) || findCallMetamethod(option))
                 {
-                    err += "\n  | " + toString(option);
+                    err << "\n  | " << toString(option);
                     continue;
                 }
 
@@ -443,9 +446,9 @@ struct ErrorConverter
                 return "Cannot call a value of type " + toString(option) + " in union:\n  " + toString(e.ty);
             }
 
-            err += "\nWe are unable to determine the appropriate result type for such a call.";
+            err << "\nWe are unable to determine the appropriate result type for such a call.";
 
-            return err;
+            return err.str();
         }
 
         if (FFlag::LuauBetterCannotCallFunctionPrimitive)
@@ -580,7 +583,8 @@ struct ErrorConverter
 
     std::string operator()(const Luau::MissingUnionProperty& e) const
     {
-        std::string ss = "Key '" + e.key + "' is missing from ";
+        std::ostringstream ss;
+        ss << "Key '" << e.key << "' is missing from ";
 
         bool first = true;
         for (auto ty : e.missing)
@@ -588,12 +592,13 @@ struct ErrorConverter
             if (first)
                 first = false;
             else
-                ss += ", ";
+                ss << ", ";
 
-            ss += "'" + toString(ty) + "'";
+            ss << "'" << toString(ty) << "'";
         }
 
-        return ss + " in the type '" + toString(e.type) + "'";
+        ss << " in the type '" << toString(e.type) << "'";
+        return ss.str();
     }
 
     std::string operator()(const TypesAreUnrelated& e) const
@@ -631,47 +636,49 @@ struct ErrorConverter
         // unary operators
         if (auto unaryString = kUnaryOps.find(tfit->function->name); unaryString != kUnaryOps.end())
         {
-            std::string result = "Operator '" + std::string(unaryString->second) + "' could not be applied to ";
+            std::ostringstream result;
+            result << "Operator '" << unaryString->second << "' could not be applied to ";
 
             if (tfit->typeArguments.size() == 1 && tfit->packArguments.empty())
             {
-                result += "operand of type " + Luau::toString(tfit->typeArguments[0]);
+                result << "operand of type " << Luau::toString(tfit->typeArguments[0]);
 
                 if (tfit->function->name != "not")
-                    result += "; there is no corresponding overload for __" + tfit->function->name;
+                    result << "; there is no corresponding overload for __" << tfit->function->name;
             }
             else
             {
                 // if it's not the expected case, we ought to add a specialization later, but this is a sane default.
-                result += "operands of types ";
+                result << "operands of types ";
 
                 bool isFirst = true;
                 for (auto arg : tfit->typeArguments)
                 {
                     if (!isFirst)
-                        result += ", ";
+                        result << ", ";
 
-                    result += Luau::toString(arg);
+                    result << Luau::toString(arg);
                     isFirst = false;
                 }
 
                 for (auto packArg : tfit->packArguments)
-                    result += ", " + Luau::toString(packArg);
+                    result << ", " << Luau::toString(packArg);
             }
 
-            return result;
+            return result.str();
         }
 
         // binary operators
         const auto binaryOps = FFlag::LuauEagerGeneralization2 ? kBinaryOps : DEPRECATED_kBinaryOps;
         if (auto binaryString = binaryOps.find(tfit->function->name); binaryString != binaryOps.end())
         {
-            std::string result = "Operator '" + std::string(binaryString->second) + "' could not be applied to operands of types ";
+            std::ostringstream result;
+            result << "Operator '" << binaryString->second << "' could not be applied to operands of types ";
 
             if (tfit->typeArguments.size() == 2 && tfit->packArguments.empty())
             {
                 // this is the expected case.
-                result += Luau::toString(tfit->typeArguments[0]) + " and " + Luau::toString(tfit->typeArguments[1]);
+                result << Luau::toString(tfit->typeArguments[0]) << " and " << Luau::toString(tfit->typeArguments[1]);
             }
             else
             {
@@ -681,19 +688,19 @@ struct ErrorConverter
                 for (auto arg : tfit->typeArguments)
                 {
                     if (!isFirst)
-                        result += ", ";
+                        result << ", ";
 
-                    result += Luau::toString(arg);
+                    result << Luau::toString(arg);
                     isFirst = false;
                 }
 
                 for (auto packArg : tfit->packArguments)
-                    result += ", " + Luau::toString(packArg);
+                    result << ", " << Luau::toString(packArg);
             }
 
-            result += "; there is no corresponding overload for __" + tfit->function->name;
+            result << "; there is no corresponding overload for __" << tfit->function->name;
 
-            return result;
+            return result.str();
         }
 
         // miscellaneous
