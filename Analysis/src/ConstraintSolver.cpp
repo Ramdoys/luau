@@ -24,6 +24,7 @@
 #include "Luau/VisitType.h"
 
 #include <algorithm>
+#include <unordered_set>
 #include <utility>
 
 LUAU_FASTFLAGVARIABLE(DebugLuauAssertOnForcedConstraint)
@@ -3698,6 +3699,10 @@ std::vector<NotNull<Constraint>> borrowConstraints(const std::vector<ConstraintP
 void dump(ConstraintSolver* cs, ToStringOptions& opts)
 {
     printf("constraints:\n");
+    
+    // Create a set for O(1) lookup of unsolved constraints
+    std::unordered_set<NotNull<const Constraint>> unsolvedSet(cs->unsolvedConstraints.begin(), cs->unsolvedConstraints.end());
+    
     for (NotNull<const Constraint> c : cs->unsolvedConstraints)
     {
         auto it = cs->blockedConstraints.find(c);
@@ -3708,7 +3713,7 @@ void dump(ConstraintSolver* cs, ToStringOptions& opts)
         {
             for (NotNull<Constraint> dep : c->dependencies)
             {
-                if (std::find(cs->unsolvedConstraints.begin(), cs->unsolvedConstraints.end(), dep) != cs->unsolvedConstraints.end())
+                if (unsolvedSet.count(dep))
                     printf("\t\t|\t%s\n", toString(*dep, opts).c_str());
             }
         }
