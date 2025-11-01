@@ -1,0 +1,2 @@
+/usr/bin/ar qc libLuau.RequireNavigator.a CMakeFiles/Luau.RequireNavigator.dir/Require/Navigator/src/PathUtilities.cpp.o CMakeFiles/Luau.RequireNavigator.dir/Require/Navigator/src/RequireNavigator.cpp.o
+/usr/bin/ranlib libLuau.RequireNavigator.a

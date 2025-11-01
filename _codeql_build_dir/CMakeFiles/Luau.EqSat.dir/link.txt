@@ -1,0 +1,2 @@
+/usr/bin/ar qc libLuau.EqSat.a CMakeFiles/Luau.EqSat.dir/EqSat/src/Id.cpp.o CMakeFiles/Luau.EqSat.dir/EqSat/src/UnionFind.cpp.o
+/usr/bin/ranlib libLuau.EqSat.a
